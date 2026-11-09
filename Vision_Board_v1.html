@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vision Board</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#141a1f; --panel:#1c242b; --panel2:#232d35; --line:#2f3b45;
+  --ink:#eef2f4; --ink2:#9fb0bc; --ink3:#66788a;
+  --green:#4fd18b; --amber:#f2a93b; --red:#ef5b5b; --blue:#5aa7ff; --violet:#9b8cff;
+  --radius:10px;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Barlow',system-ui,sans-serif;font-size:16px;line-height:1.4;-webkit-font-smoothing:antialiased;overflow:hidden}
+h1,h2,h3{font-family:'Barlow Condensed','Arial Narrow',sans-serif;letter-spacing:.01em;margin:0}
+button{font:inherit;cursor:pointer}
+
+/* ---- app shell ---- */
+#app{display:none;flex-direction:column;height:100vh}
+#app.on{display:flex}
+.bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;background:var(--panel);border-bottom:1px solid var(--line);z-index:20}
+#boardTitle{background:transparent;border:none;border-bottom:1px dashed var(--line);color:var(--ink);font-family:'Barlow Condensed';font-size:24px;font-weight:800;padding:2px 2px;line-height:1;min-width:140px;max-width:38vw}
+#boardTitle::placeholder{color:var(--ink3);opacity:.6}
+#boardTitle:focus{outline:none;border-bottom-color:var(--blue)}
+.sep{width:1px;height:26px;background:var(--line);margin:0 2px}
+.tbtn{border:1px solid var(--line);background:var(--panel2);color:var(--ink);padding:8px 12px;border-radius:8px;font-weight:600;font-size:14px;display:inline-flex;align-items:center;gap:6px}
+.tbtn:hover{border-color:var(--ink3)}
+.tbtn.ghost{background:transparent}
+.tbtn.danger{color:var(--red);border-color:rgba(239,91,91,.4)}
+.tbtn.danger.arm{background:rgba(239,91,91,.12)}
+.tbtn.icon{padding:8px 11px;font-size:16px;line-height:1}
+.tbtn:disabled{opacity:.38;cursor:default}
+.tbtn:disabled:hover{border-color:var(--line)}
+.spacer{flex:1 1 auto}
+.add i{font-family:'Barlow Condensed';font-weight:800}
+
+/* ---- board ---- */
+#scroll{flex:1 1 auto;overflow:auto;position:relative;background:var(--bg)}
+#board{position:relative;width:3200px;height:2200px;
+  background-color:#11161b;
+  background-image:radial-gradient(rgba(255,255,255,.05) 1.4px, transparent 1.4px);
+  background-size:26px 26px;cursor:grab;touch-action:none}
+#board.panning{cursor:grabbing}
+
+.item{position:absolute;top:0;left:0;will-change:transform;touch-action:none}
+.item .body{position:relative}
+.item.sel{outline:2px solid var(--blue);outline-offset:3px;border-radius:4px}
+
+/* note */
+.note .body{width:100%;min-height:90px;padding:14px 15px;border-radius:3px;color:#1b1b1b;
+  font-size:15px;line-height:1.35;box-shadow:0 10px 22px rgba(0,0,0,.35);white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere}
+.note.c-yellow .body{background:#ffe08a}
+.note.c-blue .body{background:#a9d4ff}
+.note.c-green .body{background:#a9e7c4}
+.note.c-pink .body{background:#ffb3c7}
+.note.c-violet .body{background:#cbbcff}
+
+/* quote */
+.quote .body{width:100%;min-height:70px;padding:16px 18px 16px 34px;border-radius:8px;background:var(--panel2);
+  border:1px solid var(--line);border-left:3px solid var(--amber);color:var(--ink);font-style:italic;font-size:16px;line-height:1.4;
+  box-shadow:0 10px 22px rgba(0,0,0,.4);white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere}
+.quote .body::before{content:"\201C";position:absolute;left:9px;top:2px;font-family:Georgia,serif;font-size:34px;color:var(--amber);line-height:1}
+
+/* text */
+.text .body{width:100%;min-height:40px;padding:4px 6px;color:var(--ink);font-family:'Barlow Condensed';font-weight:800;
+  font-size:30px;line-height:1.05;text-shadow:0 2px 10px rgba(0,0,0,.6);white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere}
+
+/* photo */
+.photo .body{width:100%;background:#fff;padding:7px 7px 0;border-radius:3px;box-shadow:0 12px 26px rgba(0,0,0,.45)}
+.photo img{display:block;width:100%;height:auto;border-radius:1px;pointer-events:none;-webkit-user-drag:none}
+.photo .cap{color:#222;font-size:13px;font-weight:500;padding:6px 3px 7px;min-height:26px;font-family:'Barlow',sans-serif;outline:none;white-space:pre-wrap;word-break:break-word}
+
+/* editable placeholder */
+[contenteditable]:empty:before{content:attr(data-ph);color:currentColor;opacity:.42}
+.note .body,.quote .body,.text .body,.photo .cap{outline:none}
+
+/* per-item controls */
+.ctl{position:absolute;display:none;gap:4px;z-index:5}
+.item.sel .ctl{display:flex}
+.ctl.top{top:-13px;right:-10px}
+.cbtn{width:26px;height:26px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--ink);font-size:13px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,.4)}
+.cbtn:hover{border-color:var(--ink3)}
+.cbtn.del:hover{color:var(--red);border-color:var(--red)}
+.swatches{position:absolute;left:0;top:-15px;display:none;gap:5px}
+.item.sel.note .swatches{display:flex}
+.sw{width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.5);cursor:pointer}
+.sw.c-yellow{background:#ffe08a}.sw.c-blue{background:#a9d4ff}.sw.c-green{background:#a9e7c4}.sw.c-pink{background:#ffb3c7}.sw.c-violet{background:#cbbcff}
+.rz{position:absolute;right:-7px;bottom:-7px;width:18px;height:18px;border-radius:4px;background:var(--panel);border:1px solid var(--blue);display:none;cursor:nwse-resize;touch-action:none}
+.item.sel .rz{display:block}
+
+/* hint */
+.hint{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);text-align:center;color:var(--ink3);pointer-events:none;width:80%;max-width:420px}
+.hint h3{font-size:26px;color:var(--ink2);margin-bottom:6px}
+
+/* toast */
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:999px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s;z-index:120;display:flex;align-items:center;gap:12px;max-width:92%}
+.toast.show{opacity:1;pointer-events:auto}
+.toast button{background:none;border:none;color:var(--bg);font-weight:800;text-decoration:underline;padding:0}
+
+/* intro */
+#intro{max-width:720px;margin:0 auto;padding:36px 16px 80px;overflow:auto;height:100vh}
+#intro h1{font-size:40px;font-weight:800;margin:0 0 4px;line-height:1}
+#intro .lede{color:var(--ink2);font-size:17px;margin:0 0 22px}
+.how{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px}
+.how h2{margin:0 0 12px;font-size:22px;font-weight:800;text-transform:uppercase;color:var(--ink2)}
+.how ol{margin:0;padding-left:20px}
+.how li{margin-bottom:10px;color:var(--ink)}
+.legal{margin-top:20px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:14px 16px;font-size:13.5px;color:var(--ink2)}
+.agree{display:flex;align-items:flex-start;gap:10px;margin-top:14px;cursor:pointer;font-size:15px;color:var(--ink)}
+.agree input{width:20px;height:20px;margin-top:1px;accent-color:var(--green);flex:none}
+.startrow{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:18px;flex-wrap:wrap}
+.ghostlink{border:1px solid var(--line);background:transparent;color:var(--ink2);padding:12px 16px;border-radius:8px;font-weight:600;text-decoration:none;display:inline-block}
+.ghostlink:hover{color:var(--ink);border-color:var(--ink3)}
+.btn.primary{background:var(--ink);color:var(--bg);border:1px solid var(--ink);padding:12px 16px;border-radius:8px;font-weight:700}
+.hidden{display:none!important}
+@media (max-width:560px){#intro h1{font-size:32px}#boardTitle{max-width:52vw}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<!-- ============ INTRO ============ -->
+<div id="intro">
+  <h1>Vision Board</h1>
+  <p class="lede">A free canvas for capturing the feeling of a track or project — pin photos, notes and quotes anywhere and drag them around until it looks right.</p>
+  <div class="how">
+    <h2>How it works</h2>
+    <ol>
+      <li>Name your board, then drop things onto it: <b>Note</b> for a scribble, <b>Quote</b> for a lyric or line, <b>Text</b> for a title, <b>Photo</b> for a reference image.</li>
+      <li><b>Drag anything</b> to move it, grab the corner to <b>resize</b>. Click to select; use the dots to recolour a note or the ✕ to remove it. Drag empty space to pan around the board.</li>
+      <li><b>Double-tap text</b> to edit it. You can also <b>drag image files straight onto the board</b>, or paste a copied image.</li>
+      <li>Save a <b>picture of the board (.png)</b> to view it exactly as it looks — no internet needed, perfect for offline. Or save the editable <b>board file (.json)</b> to reopen and keep working anywhere. The page also auto-saves to this browser, but that's not a real backup.</li>
+    </ol>
+    <div class="legal">The code and design of this page are the copyright of PAQUE. You're welcome to use the tool for your own projects, but the underlying code may not be copied, reproduced, redistributed or repackaged.</div>
+    <label class="agree"><input type="checkbox" id="agreeBox"><span>I understand and agree that the code on this page is copyrighted by PAQUE and may not be replicated.</span></label>
+    <div class="startrow">
+      <a class="ghostlink" href="https://www.paqueofficial.com/" target="_blank" rel="noopener">Made by PAQUE →</a>
+      <button class="btn primary hidden" id="startBtn" style="display:none">Open the board →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app">
+  <div class="bar">
+    <input id="boardTitle" placeholder="Name your board" autocomplete="off">
+    <span class="sep"></span>
+    <button class="tbtn icon" id="undoBtn" title="Undo (Ctrl+Z)" disabled>&#8630;</button>
+    <button class="tbtn icon" id="redoBtn" title="Redo (Ctrl+Shift+Z)" disabled>&#8631;</button>
+    <span class="sep"></span>
+    <button class="tbtn add" data-add="note"><i>+</i> Note</button>
+    <button class="tbtn add" data-add="quote"><i>+</i> Quote</button>
+    <button class="tbtn add" data-add="text"><i>+</i> Text</button>
+    <button class="tbtn add" data-add="photo"><i>+</i> Photo</button>
+    <input type="file" id="photoFile" accept="image/*" multiple hidden>
+    <span class="spacer"></span>
+    <button class="tbtn ghost" id="imgBtn">Save image (.png)</button>
+    <button class="tbtn ghost" id="jsonBtn">Save (.json)</button>
+    <button class="tbtn ghost" id="loadBtn">Load</button>
+    <input type="file" id="loadFile" accept=".json" hidden>
+    <button class="tbtn danger" id="resetBtn">Reset</button>
+  </div>
+  <div id="scroll">
+    <div id="board">
+      <div class="hint" id="hint"><h3>Blank canvas</h3><div>Add a note, quote, text or photo — or just drag an image straight on. Everything moves freely.</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const KEY='paque_vision_board_v1';
+  const MAXDIM=1000, JPEGQ=0.78;
+  const NOTE_COLORS=['yellow','blue','green','pink','violet'];
+
+  let state={project:'',items:[]};
+  let topZ=1, seed=0;
+  const uid=()=>Date.now().toString(36)+(seed++).toString(36)+Math.random().toString(36).slice(2,5);
+  const board=$('board'), scroll=$('scroll');
+  let selId=null;
+
+  // ---- intro gate ----
+  $('agreeBox').addEventListener('change',e=>{const b=$('startBtn');b.style.display=e.target.checked?'inline-block':'none';b.classList.toggle('hidden',!e.target.checked);});
+  $('startBtn').addEventListener('click',()=>{
+    $('intro').classList.add('hidden');$('app').classList.add('on');
+    load();renderAll();seedHistory();centreScroll();if(!$('boardTitle').value)$('boardTitle').focus();
+  });
+  function centreScroll(){scroll.scrollLeft=(board.offsetWidth-scroll.clientWidth)/2;scroll.scrollTop=(board.offsetHeight-scroll.clientHeight)/3;}
+
+  // ---- persistence ----
+  function save(){state.project=$('boardTitle').value.trim();try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){toast('Storage full — save to JSON to keep everything');}}
+  function load(){try{const d=JSON.parse(localStorage.getItem(KEY));if(d&&Array.isArray(d.items)){state={project:d.project||'',items:d.items};$('boardTitle').value=state.project;}}catch(e){}}
+  $('boardTitle').addEventListener('input',save);
+  $('boardTitle').addEventListener('change',()=>commit());
+
+  // ---- undo / redo history ----
+  // Snapshots reuse image strings by reference (clone copies item fields but shares the img data),
+  // so a long history stays cheap even with photos.
+  let hist=[], hi=-1, lastSig='', MAXHIST=150;
+  function cloneState(s){return {project:s.project||'',items:s.items.map(i=>Object.assign({},i))};}
+  function sig(s){return JSON.stringify({p:s.project||'',it:s.items.map(i=>{const o=Object.assign({},i);o.img=i.img?('#'+i.img.length):0;return o;})});}
+  function updateHistBtns(){$('undoBtn').disabled=hi<=0;$('redoBtn').disabled=hi>=hist.length-1;}
+  function seedHistory(){hist=[cloneState(state)];hi=0;lastSig=sig(state);updateHistBtns();}
+  function commit(){
+    state.project=$('boardTitle').value.trim();save();
+    const s=sig(state);if(s===lastSig)return;
+    if(hi<hist.length-1)hist=hist.slice(0,hi+1);
+    hist.push(cloneState(state));hi=hist.length-1;lastSig=s;
+    if(hist.length>MAXHIST){hist=hist.slice(hist.length-MAXHIST);hi=hist.length-1;}
+    updateHistBtns();
+  }
+  function restoreCurrent(){state=cloneState(hist[hi]);$('boardTitle').value=state.project||'';try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}renderAll();updateHistBtns();}
+  function undo(){if(hi>0){hi--;lastSig=sig(hist[hi]);restoreCurrent();toast('Undo');}}
+  function redo(){if(hi<hist.length-1){hi++;lastSig=sig(hist[hi]);restoreCurrent();toast('Redo');}}
+  $('undoBtn').onclick=undo;$('redoBtn').onclick=redo;
+  window.addEventListener('keydown',e=>{
+    if(!$('app').classList.contains('on'))return;
+    const ae=document.activeElement;if(ae&&ae.isContentEditable)return; // let native text undo run while typing
+    const k=e.key.toLowerCase();
+    if((e.ctrlKey||e.metaKey)&&k==='z'){e.preventDefault();if(e.shiftKey)redo();else undo();}
+    else if((e.ctrlKey||e.metaKey)&&k==='y'){e.preventDefault();redo();}
+  });
+  // commit a text/caption edit when the field loses focus
+  board.addEventListener('focusout',e=>{if(e.target&&e.target.classList&&e.target.classList.contains('edit'))commit();});
+
+  // ---- create items ----
+  function viewCentre(){return {x:scroll.scrollLeft+scroll.clientWidth/2,y:scroll.scrollTop+scroll.clientHeight/2};}
+  let cascade=0;
+  function addItem(type,extra){
+    const c=viewCentre();
+    const off=(cascade++%6)*26;
+    const base={id:uid(),type,x:c.x-100+off,y:c.y-70+off,z:++topZ,rot:(Math.random()*6-3),w:type==='quote'?280:(type==='text'?260:190)};
+    if(type==='note'){base.color=NOTE_COLORS[0];base.text='';}
+    if(type==='quote'||type==='text'){base.text='';}
+    if(type==='photo'){base.img=extra.img;base.aspect=extra.aspect;base.w=extra.w||240;base.caption='';base.rot=(Math.random()*5-2.5);if(extra.x!=null){base.x=extra.x;base.y=extra.y;}}
+    state.items.push(base);renderAll();commit();
+    if(type!=='photo'){const el=board.querySelector(`[data-id="${base.id}"] .edit`);if(el){select(base.id);focusEnd(el);}}
+    else select(base.id);
+  }
+  document.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{const t=b.dataset.add;if(t==='photo')$('photoFile').click();else addItem(t);});
+
+  // ---- photo input ----
+  $('photoFile').onchange=e=>{const fs=[...e.target.files];fs.forEach(f=>readImage(f,(img,aspect)=>addItem('photo',{img,aspect})));e.target.value='';};
+
+  // ---- render ----
+  function renderAll(){
+    [...board.querySelectorAll('.item')].forEach(n=>n.remove());
+    topZ=state.items.reduce((m,i)=>Math.max(m,i.z||1),1);
+    state.items.forEach(renderItem);
+    $('hint').style.display=state.items.length?'none':'block';
+  }
+  function place(el,it){el.style.transform=`translate(${it.x}px,${it.y}px) rotate(${it.rot||0}deg)`;el.style.width=it.w+'px';el.style.zIndex=it.z;}
+  function renderItem(it){
+    const el=document.createElement('div');
+    el.className='item '+it.type+(it.type==='note'?' c-'+it.color:'');
+    el.dataset.id=it.id;place(el,it);
+    let inner='';
+    if(it.type==='note') inner=`<div class="body edit" contenteditable="true" data-ph="Write a note…"></div>`;
+    else if(it.type==='quote') inner=`<div class="body edit" contenteditable="true" data-ph="Add a quote or lyric…"></div>`;
+    else if(it.type==='text') inner=`<div class="body edit" contenteditable="true" data-ph="Title…"></div>`;
+    else if(it.type==='photo') inner=`<div class="body"><img src="${it.img}" alt=""><div class="cap edit" contenteditable="true" data-ph="Caption (optional)"></div></div>`;
+    const sw=NOTE_COLORS.map(c=>`<span class="sw c-${c}" data-c="${c}"></span>`).join('');
+    el.innerHTML=inner+`<div class="swatches">${sw}</div><div class="ctl top"><button class="cbtn del" title="Delete">✕</button></div><div class="rz" title="Resize"></div>`;
+    const ed=el.querySelector('.edit');
+    if(ed){const txt=it.type==='photo'?(it.caption||''):(it.text||'');ed.innerText=txt;
+      ed.addEventListener('input',()=>{if(it.type==='photo')it.caption=ed.innerText;else it.text=ed.innerText;debounceSave();});
+    }
+    el.querySelectorAll('.sw').forEach(s=>s.onclick=ev=>{ev.stopPropagation();it.color=s.dataset.c;el.className='item note c-'+it.color+(selId===it.id?' sel':'');commit();});
+    el.querySelector('.del').onclick=ev=>{ev.stopPropagation();removeItem(it.id);};
+    attachDrag(el,it);
+    attachResize(el.querySelector('.rz'),el,it);
+    board.appendChild(el);
+  }
+  let dsT;function debounceSave(){clearTimeout(dsT);dsT=setTimeout(save,400);}
+  function focusEnd(el){el.focus();const r=document.createRange();r.selectNodeContents(el);r.collapse(false);const s=getSelection();s.removeAllRanges();s.addRange(r);}
+
+  // ---- selection ----
+  function select(id){selId=id;board.querySelectorAll('.item').forEach(n=>n.classList.toggle('sel',n.dataset.id===id));const it=state.items.find(x=>x.id===id);if(it){it.z=++topZ;const el=board.querySelector(`[data-id="${id}"]`);if(el)el.style.zIndex=it.z;}}
+  function deselect(){selId=null;board.querySelectorAll('.item.sel').forEach(n=>n.classList.remove('sel'));}
+
+  // ---- drag (with tap-to-edit threshold) ----
+  function attachDrag(el,it){
+    const body=el.querySelector('.body');
+    el.addEventListener('pointerdown',e=>{
+      if(e.target.closest('.rz')||e.target.closest('.cbtn')||e.target.closest('.sw'))return;
+      e.preventDefault(); // we manage focus manually so tap-to-edit and drag don't fight
+      select(it.id);
+      const r=board.getBoundingClientRect();
+      const ox=(e.clientX-r.left)-it.x, oy=(e.clientY-r.top)-it.y;
+      let moved=false;const sx=e.clientX,sy=e.clientY;
+      el.setPointerCapture(e.pointerId);
+      const mv=ev=>{
+        if(!moved&&Math.hypot(ev.clientX-sx,ev.clientY-sy)<5)return;
+        if(!moved){moved=true;const a=document.activeElement;if(a&&a.classList&&a.classList.contains('edit'))a.blur();}
+        const rr=board.getBoundingClientRect();
+        it.x=(ev.clientX-rr.left)-ox;it.y=(ev.clientY-rr.top)-oy;
+        el.style.transform=`translate(${it.x}px,${it.y}px) rotate(${it.rot||0}deg)`;
+      };
+      const up=ev=>{
+        el.releasePointerCapture(e.pointerId);
+        el.removeEventListener('pointermove',mv);el.removeEventListener('pointerup',up);
+        if(moved){commit();}
+        else{const ed=el.querySelector('.edit');if(ed)focusEnd(ed);} // tap (no move) = edit
+      };
+      el.addEventListener('pointermove',mv);el.addEventListener('pointerup',up);
+    });
+  }
+
+  // ---- resize ----
+  function attachResize(handle,el,it){
+    if(!handle)return;
+    handle.addEventListener('pointerdown',e=>{
+      e.preventDefault();e.stopPropagation();select(it.id);
+      const sx=e.clientX,sw=it.w;handle.setPointerCapture(e.pointerId);
+      const mv=ev=>{let w=Math.max(70,Math.round(sw+(ev.clientX-sx)));it.w=w;el.style.width=w+'px';};
+      const up=()=>{handle.releasePointerCapture(e.pointerId);handle.removeEventListener('pointermove',mv);handle.removeEventListener('pointerup',up);commit();};
+      handle.addEventListener('pointermove',mv);handle.addEventListener('pointerup',up);
+    });
+  }
+
+  // ---- delete (undo via history) ----
+  function removeItem(id){
+    const idx=state.items.findIndex(x=>x.id===id);if(idx<0)return;
+    state.items.splice(idx,1);if(selId===id)selId=null;renderAll();commit();
+    toast('Removed');
+  }
+
+  // ---- board: pan on empty + deselect ----
+  board.addEventListener('pointerdown',e=>{
+    if(e.target!==board&&!e.target.classList.contains('hint')&&!e.target.closest('.hint'))return;
+    deselect();
+    const sx=e.clientX,sy=e.clientY,sl=scroll.scrollLeft,st=scroll.scrollTop;let moved=false;
+    board.classList.add('panning');board.setPointerCapture(e.pointerId);
+    const mv=ev=>{moved=true;scroll.scrollLeft=sl-(ev.clientX-sx);scroll.scrollTop=st-(ev.clientY-sy);};
+    const up=()=>{board.classList.remove('panning');board.releasePointerCapture(e.pointerId);board.removeEventListener('pointermove',mv);board.removeEventListener('pointerup',up);};
+    board.addEventListener('pointermove',mv);board.addEventListener('pointerup',up);
+  });
+
+  // ---- drag-drop + paste images ----
+  scroll.addEventListener('dragover',e=>{e.preventDefault();});
+  scroll.addEventListener('drop',e=>{
+    e.preventDefault();const r=board.getBoundingClientRect();
+    const x=e.clientX-r.left,y=e.clientY-r.top;
+    [...(e.dataTransfer.files||[])].filter(f=>/^image\//.test(f.type)).forEach((f,i)=>readImage(f,(img,aspect)=>addItem('photo',{img,aspect,x:x-120+i*18,y:y-90+i*18})));
+  });
+  window.addEventListener('paste',e=>{
+    if(!$('app').classList.contains('on'))return;
+    const its=[...(e.clipboardData&&e.clipboardData.items||[])];
+    const imgItem=its.find(i=>/^image\//.test(i.type));
+    if(imgItem){const f=imgItem.getAsFile();if(f)readImage(f,(img,aspect)=>addItem('photo',{img,aspect}));}
+  });
+
+  // ---- image compress ----
+  function readImage(f,cb){
+    if(!f||!/^image\//.test(f.type)){toast('That\'s not an image');return;}
+    const rd=new FileReader();
+    rd.onload=()=>{const img=new Image();img.onload=()=>{
+      let w=img.width,h=img.height;const scale=Math.min(1,MAXDIM/Math.max(w,h));
+      const cw=Math.round(w*scale),ch=Math.round(h*scale);
+      const cv=document.createElement('canvas');cv.width=cw;cv.height=ch;cv.getContext('2d').drawImage(img,0,0,cw,ch);
+      try{cb(cv.toDataURL('image/jpeg',JPEGQ),cw/ch);}catch(err){toast('Could not read that image');}
+    };img.onerror=()=>toast('Could not read that image');img.src=rd.result;};
+    rd.readAsDataURL(f);
+  }
+
+  // ---- image export (self-contained canvas render) ----
+  const NOTEHEX={yellow:'#ffe08a',blue:'#a9d4ff',green:'#a9e7c4',pink:'#ffb3c7',violet:'#cbbcff'};
+  const F_NOTE='15px Barlow, system-ui, sans-serif', F_QUOTE='italic 16px Barlow, system-ui, sans-serif',
+        F_TEXT='800 30px "Barlow Condensed", system-ui, sans-serif', F_CAP='500 13px Barlow, system-ui, sans-serif';
+  const LH_NOTE=20, LH_QUOTE=22, LH_TEXT=32, LH_CAP=18;
+  function wrapText(ctx,text,maxW,font){
+    ctx.font=font;const out=[];
+    String(text==null?'':text).split('\n').forEach(para=>{
+      if(para===''){out.push('');return;}
+      const words=para.split(/(\s+)/);let line='';
+      const push=()=>{out.push(line);line='';};
+      words.forEach(w=>{
+        const t=line+w;
+        if(ctx.measureText(t).width<=maxW||line===''){ if(ctx.measureText(w).width>maxW&&line===''){ // hard-break long word
+            let chunk='';for(const ch of w){ if(ctx.measureText(chunk+ch).width>maxW&&chunk!==''){out.push(chunk);chunk=ch;} else chunk+=ch; } line=chunk; }
+          else line=t; }
+        else { push(); line=w.replace(/^\s+/,''); }
+      });
+      push();
+    });
+    return out.length?out:[''];
+  }
+  function layoutItem(ctx,it){
+    if(it.type==='note'){const lines=wrapText(ctx,it.text,it.w-30,F_NOTE);return {w:it.w,h:Math.max(90,28+lines.length*LH_NOTE),lines};}
+    if(it.type==='quote'){const lines=wrapText(ctx,it.text,it.w-52,F_QUOTE);return {w:it.w,h:Math.max(70,32+lines.length*LH_QUOTE),lines};}
+    if(it.type==='text'){const lines=wrapText(ctx,it.text||'',it.w-12,F_TEXT);return {w:it.w,h:Math.max(40,8+lines.length*LH_TEXT),lines};}
+    // photo
+    const imgW=it.w-14, imgH=imgW/(it.aspect||1.3);
+    const capLines=it.caption?wrapText(ctx,it.caption,it.w-6,F_CAP):[];
+    const capH=it.caption?(capLines.length*LH_CAP+13):7;
+    return {w:it.w,h:7+imgH+capH,imgW,imgH,capLines,capH};
+  }
+  function rr(ctx,x,y,w,h,r){r=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+  function drawItem(ctx,o,imgs){
+    const it=o.it;
+    if(it.type==='note'){
+      ctx.save();ctx.shadowColor='rgba(0,0,0,0.35)';ctx.shadowBlur=18;ctx.shadowOffsetY=10;rr(ctx,0,0,o.w,o.h,3);ctx.fillStyle=NOTEHEX[it.color]||'#ffe08a';ctx.fill();ctx.restore();
+      ctx.fillStyle='#1b1b1b';ctx.font=F_NOTE;ctx.textBaseline='top';o.lines.forEach((ln,i)=>ctx.fillText(ln,15,14+i*LH_NOTE));
+    } else if(it.type==='quote'){
+      ctx.save();ctx.shadowColor='rgba(0,0,0,0.4)';ctx.shadowBlur=18;ctx.shadowOffsetY=10;rr(ctx,0,0,o.w,o.h,8);ctx.fillStyle='#232d35';ctx.fill();ctx.restore();
+      rr(ctx,0,0,o.w,o.h,8);ctx.lineWidth=1;ctx.strokeStyle='#2f3b45';ctx.stroke();
+      ctx.save();ctx.beginPath();ctx.rect(0,0,3,o.h);ctx.fillStyle='#f2a93b';ctx.fill();ctx.restore();
+      ctx.fillStyle='#f2a93b';ctx.font='34px Georgia, serif';ctx.textBaseline='top';ctx.fillText('“',8,-4);
+      ctx.fillStyle='#eef2f4';ctx.font=F_QUOTE;ctx.textBaseline='top';o.lines.forEach((ln,i)=>ctx.fillText(ln,34,16+i*LH_QUOTE));
+    } else if(it.type==='text'){
+      ctx.save();ctx.shadowColor='rgba(0,0,0,0.6)';ctx.shadowBlur=10;ctx.shadowOffsetY=2;ctx.fillStyle='#eef2f4';ctx.font=F_TEXT;ctx.textBaseline='top';o.lines.forEach((ln,i)=>ctx.fillText(ln,6,4+i*LH_TEXT));ctx.restore();
+    } else if(it.type==='photo'){
+      ctx.save();ctx.shadowColor='rgba(0,0,0,0.45)';ctx.shadowBlur=20;ctx.shadowOffsetY=12;rr(ctx,0,0,o.w,o.h,3);ctx.fillStyle='#fff';ctx.fill();ctx.restore();
+      const im=imgs[it.id];if(im)ctx.drawImage(im,7,7,o.imgW,o.imgH);
+      if(it.caption){ctx.fillStyle='#222';ctx.font=F_CAP;ctx.textBaseline='top';o.capLines.forEach((ln,i)=>ctx.fillText(ln,7,7+o.imgH+6+i*LH_CAP));}
+    }
+  }
+  async function exportImage(){
+    if(!state.items.length){toast('Nothing to capture yet');return;}
+    toast('Building image…');
+    const imgs={};
+    await Promise.all(state.items.filter(i=>i.type==='photo').map(i=>new Promise(res=>{const im=new Image();im.onload=()=>{imgs[i.id]=im;res();};im.onerror=()=>res();im.src=i.img;})));
+    try{if(document.fonts&&document.fonts.ready)await document.fonts.ready;}catch(e){}
+    const m=document.createElement('canvas').getContext('2d');
+    const laid=state.items.map(it=>({it,...layoutItem(m,it)}));
+    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+    laid.forEach(o=>{const cx=o.it.x+o.w/2,cy=o.it.y+o.h/2,rad=(o.it.rot||0)*Math.PI/180,hw=o.w/2,hh=o.h/2;
+      [[-hw,-hh],[hw,-hh],[hw,hh],[-hw,hh]].forEach(([dx,dy])=>{const rx=cx+dx*Math.cos(rad)-dy*Math.sin(rad),ry=cy+dx*Math.sin(rad)+dy*Math.cos(rad);
+        minX=Math.min(minX,rx);maxX=Math.max(maxX,rx);minY=Math.min(minY,ry);maxY=Math.max(maxY,ry);});});
+    const PAD=48;minX-=PAD;minY-=PAD;maxX+=PAD;maxY+=PAD;
+    const W=Math.max(1,Math.round(maxX-minX)),H=Math.max(1,Math.round(maxY-minY));
+    let scale=2;const cap=4200;if(W*scale>cap||H*scale>cap)scale=Math.max(1,Math.min(cap/W,cap/H));
+    const cv=document.createElement('canvas');cv.width=Math.round(W*scale);cv.height=Math.round(H*scale);
+    const ctx=cv.getContext('2d');ctx.scale(scale,scale);ctx.translate(-minX,-minY);
+    ctx.fillStyle='#11161b';ctx.fillRect(minX,minY,W,H);
+    ctx.fillStyle='rgba(255,255,255,0.05)';const gs=26,x0=Math.floor(minX/gs)*gs,y0=Math.floor(minY/gs)*gs;
+    for(let gx=x0;gx<=maxX;gx+=gs)for(let gy=y0;gy<=maxY;gy+=gs){ctx.beginPath();ctx.arc(gx,gy,1.3,0,6.3);ctx.fill();}
+    laid.slice().sort((a,b)=>(a.it.z||0)-(b.it.z||0)).forEach(o=>{
+      ctx.save();ctx.translate(o.it.x+o.w/2,o.it.y+o.h/2);ctx.rotate((o.it.rot||0)*Math.PI/180);ctx.translate(-o.w/2,-o.h/2);
+      drawItem(ctx,o,imgs);ctx.restore();});
+    cv.toBlob(bl=>{if(!bl){toast('Could not build the image');return;}dl(bl,slug($('boardTitle').value.trim()||'vision_board')+'_'+stamp()+'.png');toast('Image saved');},'image/png');
+  }
+  $('imgBtn').onclick=()=>exportImage();
+
+  // ---- session ----
+  $('jsonBtn').onclick=()=>{if(!state.items.length){toast('Nothing to save yet');return;}save();dl(new Blob([JSON.stringify(state)],{type:'application/json'}),slug($('boardTitle').value.trim()||'vision_board')+'_'+stamp()+'.json');toast('Board saved');};
+  $('loadBtn').onclick=()=>$('loadFile').click();
+  $('loadFile').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);if(!Array.isArray(d.items))throw 0;state={project:d.project||'',items:d.items};$('boardTitle').value=state.project;save();renderAll();seedHistory();centreScroll();toast('Board loaded');}catch{toast("That file isn't a saved board");}e.target.value='';};rd.readAsText(f);};
+  let rstArmed=false,rstT;
+  $('resetBtn').onclick=()=>{
+    if(!state.items.length&&!$('boardTitle').value.trim()){toast('Nothing to reset');return;}
+    if(!rstArmed){rstArmed=true;$('resetBtn').textContent='Tap to wipe all';$('resetBtn').classList.add('arm');clearTimeout(rstT);rstT=setTimeout(()=>{rstArmed=false;$('resetBtn').textContent='Reset';$('resetBtn').classList.remove('arm');},3000);toast('Save to JSON first if you want to keep this');return;}
+    clearTimeout(rstT);rstArmed=false;$('resetBtn').textContent='Reset';$('resetBtn').classList.remove('arm');
+    state={project:'',items:[]};$('boardTitle').value='';try{localStorage.removeItem(KEY);}catch(e){}
+    renderAll();seedHistory();toast('Board reset');
+  };
+
+  // ---- helpers ----
+  function dl(blob,name){const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);}
+  function stamp(){return new Date().toISOString().slice(0,10);}
+  function slug(s){return String(s||'board').replace(/[^a-z0-9]+/gi,'_').replace(/^_+|_+$/g,'')||'board';}
+  let tt;function toast(m,action){const t=$('toast');t.innerHTML='';t.append(document.createTextNode(m));if(action){const b=document.createElement('button');b.textContent=action.label;b.onclick=()=>{action.fn();t.classList.remove('show');};t.appendChild(b);}t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),action?5000:2000);}
+})();
+</script>
+</body>
+</html>
